@@ -17,46 +17,87 @@
  * NativeInteger basic type description.
  */
 static const ber_tlv_tag_t asn_DEF_NativeInteger_tags[] = {
-	(ASN_TAG_CLASS_UNIVERSAL | (2 << 2))
+    (ASN_TAG_CLASS_UNIVERSAL | (2 << 2))
 };
 asn_TYPE_operation_t asn_OP_NativeInteger = {
-	NativeInteger_free,
-	NativeInteger_print,
-	NativeInteger_compare,
-	NativeInteger_decode_ber,
-	NativeInteger_encode_der,
-	NativeInteger_decode_xer,
-	NativeInteger_encode_xer,
-#ifdef	ASN_DISABLE_OER_SUPPORT
-	0,
-	0,
+    NativeInteger_free,
+#if !defined(ASN_DISABLE_PRINT_SUPPORT)
+    NativeInteger_print,
 #else
-	NativeInteger_decode_oer,	/* OER decoder */
-	NativeInteger_encode_oer,	/* Canonical OER encoder */
-#endif  /* ASN_DISABLE_OER_SUPPORT */
-#ifdef	ASN_DISABLE_PER_SUPPORT
-	0,
-	0,
+    0,
+#endif  /* !defined(ASN_DISABLE_PRINT_SUPPORT) */
+    NativeInteger_compare,
+#if !defined(ASN_DISABLE_BER_SUPPORT)
+    NativeInteger_decode_ber,
+    NativeInteger_encode_der,
 #else
-	NativeInteger_decode_uper,	/* Unaligned PER decoder */
-	NativeInteger_encode_uper,	/* Unaligned PER encoder */
-#endif	/* ASN_DISABLE_PER_SUPPORT */
-	NativeInteger_random_fill,
-	0	/* Use generic outmost tag fetcher */
+    0,
+    0,
+#endif  /* !defined(ASN_DISABLE_BER_SUPPORT) */
+#if !defined(ASN_DISABLE_XER_SUPPORT)
+    NativeInteger_decode_xer,
+    NativeInteger_encode_xer,
+#else
+    0,
+    0,
+#endif  /* !defined(ASN_DISABLE_XER_SUPPORT) */
+#if !defined(ASN_DISABLE_JER_SUPPORT)
+    NativeInteger_decode_jer,
+    NativeInteger_encode_jer,
+#else
+    0,
+    0,
+#endif  /* !defined(ASN_DISABLE_JER_SUPPORT) */
+#if !defined(ASN_DISABLE_OER_SUPPORT)
+    NativeInteger_decode_oer,  /* OER decoder */
+    NativeInteger_encode_oer,  /* Canonical OER encoder */
+#else
+    0,
+    0,
+#endif  /* !defined(ASN_DISABLE_OER_SUPPORT) */
+#if !defined(ASN_DISABLE_UPER_SUPPORT)
+    NativeInteger_decode_uper,  /* Unaligned PER decoder */
+    NativeInteger_encode_uper,  /* Unaligned PER encoder */
+#else
+    0,
+    0,
+#endif  /* !defined(ASN_DISABLE_UPER_SUPPORT) */
+#if !defined(ASN_DISABLE_APER_SUPPORT)
+    NativeInteger_decode_aper,  /* Aligned PER decoder */
+    NativeInteger_encode_aper,  /* Aligned PER encoder */
+#else
+    0,
+    0,
+#endif  /* !defined(ASN_DISABLE_APER_SUPPORT) */
+#if !defined(ASN_DISABLE_RFILL_SUPPORT)
+    NativeInteger_random_fill,
+#else
+    0,
+#endif  /* !defined(ASN_DISABLE_RFILL_SUPPORT) */
+    0  /* Use generic outmost tag fetcher */
 };
 asn_TYPE_descriptor_t asn_DEF_NativeInteger = {
-	"INTEGER",			/* The ASN.1 type is still INTEGER */
-	"INTEGER",
-	&asn_OP_NativeInteger,
-	asn_DEF_NativeInteger_tags,
-	sizeof(asn_DEF_NativeInteger_tags) / sizeof(asn_DEF_NativeInteger_tags[0]),
-	asn_DEF_NativeInteger_tags,	/* Same as above */
-	sizeof(asn_DEF_NativeInteger_tags) / sizeof(asn_DEF_NativeInteger_tags[0]),
-	{ 0, 0, asn_generic_no_constraint },
-	0, 0,	/* No members */
-	0	/* No specifics */
+    "INTEGER",  /* The ASN.1 type is still INTEGER */
+    "INTEGER",
+    &asn_OP_NativeInteger,
+    asn_DEF_NativeInteger_tags,
+    sizeof(asn_DEF_NativeInteger_tags) / sizeof(asn_DEF_NativeInteger_tags[0]),
+    asn_DEF_NativeInteger_tags,  /* Same as above */
+    sizeof(asn_DEF_NativeInteger_tags) / sizeof(asn_DEF_NativeInteger_tags[0]),
+    {
+#if !defined(ASN_DISABLE_OER_SUPPORT)
+        0,
+#endif  /* !defined(ASN_DISABLE_OER_SUPPORT) */
+#if !defined(ASN_DISABLE_UPER_SUPPORT) || !defined(ASN_DISABLE_APER_SUPPORT)
+        0,
+#endif  /* !defined(ASN_DISABLE_UPER_SUPPORT) || !defined(ASN_DISABLE_APER_SUPPORT) */
+        asn_generic_no_constraint
+    },
+    0, 0,  /* No members */
+    0  /* No specifics */
 };
 
+#ifndef ASN_DISABLE_BER_SUPPORT
 /*
  * Decode INTEGER type.
  */
@@ -178,7 +219,9 @@ NativeInteger_encode_der(const asn_TYPE_descriptor_t *sd, const void *ptr,
     }
 	return erval;
 }
+#endif /* ASN_DISABLE_BER_SUPPORT */
 
+#ifndef ASN_DISABLE_XER_SUPPORT
 /*
  * Decode the chunk of XML text encoding INTEGER.
  */
@@ -249,6 +292,7 @@ NativeInteger_encode_xer(const asn_TYPE_descriptor_t *td, const void *sptr,
 
 	ASN__ENCODED_OK(er);
 }
+#endif /* ASN_DISABLE_XER_SUPPORT */
 
 #ifndef  ASN_DISABLE_PER_SUPPORT
 
@@ -317,6 +361,7 @@ NativeInteger_encode_uper(const asn_TYPE_descriptor_t *td,
 
 #endif  /* ASN_DISABLE_PER_SUPPORT */
 
+#ifndef ASN_DISABLE_PRINT_SUPPORT
 /*
  * INTEGER specific human-readable output.
  */
@@ -352,6 +397,7 @@ NativeInteger_print(const asn_TYPE_descriptor_t *td, const void *sptr,
 		return (cb("<absent>", 8, app_key) < 0) ? -1 : 0;
 	}
 }
+#endif /* ASN_DISABLE_PRINT_SUPPORT */
 
 void
 NativeInteger_free(const asn_TYPE_descriptor_t *td, void *ptr,
@@ -407,78 +453,4 @@ NativeInteger_compare(const asn_TYPE_descriptor_t *td, const void *aptr, const v
     } else {
         return 1;
     }
-}
-
-asn_random_fill_result_t
-NativeInteger_random_fill(const asn_TYPE_descriptor_t *td, void **sptr,
-                          const asn_encoding_constraints_t *constraints,
-                          size_t max_length) {
-    const asn_INTEGER_specifics_t *specs =
-        (const asn_INTEGER_specifics_t *)td->specifics;
-    asn_random_fill_result_t result_ok = {ARFILL_OK, 1};
-    asn_random_fill_result_t result_failed = {ARFILL_FAILED, 0};
-    asn_random_fill_result_t result_skipped = {ARFILL_SKIPPED, 0};
-    long *st = *sptr;
-    const asn_INTEGER_enum_map_t *emap;
-    size_t emap_len;
-    intmax_t value;
-    int find_inside_map;
-
-    if(max_length == 0) return result_skipped;
-
-    if(st == NULL) {
-        st = (long *)CALLOC(1, sizeof(*st));
-        if(st == NULL) {
-            return result_failed;
-        }
-    }
-
-    if(specs) {
-        emap = specs->value2enum;
-        emap_len = specs->map_count;
-        if(specs->strict_enumeration) {
-            find_inside_map = emap_len > 0;
-        } else {
-            find_inside_map = emap_len ? asn_random_between(0, 1) : 0;
-        }
-    } else {
-        emap = 0;
-        emap_len = 0;
-        find_inside_map = 0;
-    }
-
-    if(find_inside_map) {
-        assert(emap_len > 0);
-        value = emap[asn_random_between(0, emap_len - 1)].nat_value;
-    } else {
-        const asn_per_constraints_t *ct;
-
-        static const long variants[] = {
-            -65536, -65535, -65534, -32769, -32768, -32767, -16385, -16384,
-            -16383, -257,   -256,   -255,   -254,   -129,   -128,   -127,
-            -126,   -1,     0,      1,      126,    127,    128,    129,
-            254,    255,    256,    257,    16383,  16384,  16385,  32767,
-            32768,  32769,  65534,  65535,  65536,  65537};
-        if(specs && specs->field_unsigned) {
-            assert(variants[18] == 0);
-            value = variants[asn_random_between(
-                18, sizeof(variants) / sizeof(variants[0]) - 1)];
-        } else {
-            value = variants[asn_random_between(
-                0, sizeof(variants) / sizeof(variants[0]) - 1)];
-        }
-
-        if(!constraints) constraints = &td->encoding_constraints;
-        ct = constraints ? constraints->per_constraints : 0;
-        if(ct && (ct->value.flags & APC_CONSTRAINED)) {
-            if(value < ct->value.lower_bound || value > ct->value.upper_bound) {
-                value = asn_random_between(ct->value.lower_bound,
-                                           ct->value.upper_bound);
-            }
-        }
-    }
-
-    *sptr = st;
-    *st = value;
-    return result_ok;
 }

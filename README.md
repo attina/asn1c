@@ -31,18 +31,19 @@ If you need to _process_ data conforming to the standard(s) specified in the
 column 3, use the API function specified in column 4.
 See the [doc/asn1c-usage.pdf](doc/asn1c-usage.pdf) for details.
 
-Encoding       | API function       | Understood by | API function
--------------- | ------------------ | ------------- | -------------
-BER            | der_encode()       | BER           | ber_decode()
-DER            | der_encode()       | DER, BER      | ber_decode()
-CER            | _not supported_    | CER, BER      | ber_decode()
-BASIC-OER      | oer_encode()       | *-OER         | oer_decode()
-CANONICAL-OER  | oer_encode()       | *-OER         | oer_decode()
-BASIC-UPER     | uper_encode()      | *-UPER        | uper_decode()
-CANONICAL-UPER | uper_encode()      | *-UPER        | uper_decode()
-*-APER         | _not supported_    | *-APER        | _not supported_
-BASIC-XER      | xer_encode(XER_F_BASIC)    | *-XER | xer_decode()
-CANONICAL-XER  | xer_encode(XER_F_CANONICAL)| *-XER | xer_decode()
+Encoding       | API function               | Understood by | API function
+-------------- | -------------------------- | ------------- | -------------
+BER            | der_encode()               | BER           | ber_decode()
+DER            | der_encode()               | DER, BER      | ber_decode()
+CER            | _not supported_            | CER, BER      | ber_decode()
+BASIC-OER      | oer_encode()               | *-OER         | oer_decode()
+CANONICAL-OER  | oer_encode()               | *-OER         | oer_decode()
+BASIC-UPER     | uper_encode()              | *-UPER        | uper_decode()
+CANONICAL-UPER | uper_encode()              | *-UPER        | uper_decode()
+*-APER         | _not supported_            | *-APER        | _not supported_
+BASIC-XER      | xer_encode(XER_F_BASIC)    | *-XER         | xer_decode()
+CANONICAL-XER  | xer_encode(XER_F_CANONICAL)| *-XER         | xer_decode()
+JER            | jer_encode()               | JER           | _not supported_
 
 *) Asterisk means both BASIC and CANONICAL variants.
 </details>
@@ -52,7 +53,7 @@ CANONICAL-XER  | xer_encode(XER_F_CANONICAL)| *-XER | xer_decode()
 If you haven't installed the asn1c yet, read the [INSTALL.md](INSTALL.md) file
 for a short installation guide.
 
-[![Build Status](https://travis-ci.org/vlm/asn1c.svg?branch=master)](https://travis-ci.org/vlm/asn1c)
+[![Build Status](https://travis-ci.com/mouse07410/asn1c.svg?branch=vlm_master)](https://travis-ci.com/mouse07410/asn1c)
 
 # Documentation
 

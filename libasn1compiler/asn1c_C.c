@@ -94,7 +94,7 @@ static int emit_type_DEF(arg_t *arg, asn1p_expr_t *expr, enum tvm_compat tv_mode
 } while(0)
 
 /* MKID_safe() without checking for reserved keywords */
-#define	MKID(expr)	(asn1c_make_identifier(0, expr, 0))
+#define	MKID(expr)	(asn1c_make_identifier(AMI_USE_PREFIX, expr, 0))
 #define	MKID_safe(expr)	(asn1c_make_identifier(AMI_CHECK_RESERVED, expr, 0))
 
 int
@@ -329,6 +329,7 @@ asn1c_lang_C_type_SEQUENCE(arg_t *arg) {
 	int comp_mode = 0;	/* {root,ext=1,root,root,...} */
 	int saved_target = arg->target->target;
     asn1c_ioc_table_and_objset_t ioc_tao;
+	int ext_num = 1;
 
 	DEPENDENCIES;
 
@@ -372,8 +373,16 @@ asn1c_lang_C_type_SEQUENCE(arg_t *arg) {
             }
             INDENT(-1);
             tmp_arg.embed--;
-            if(v->expr_type != A1TC_EXTENSIBLE) OUT(";\n");
         } else {
+            char ext_name[20];
+
+            if((v->expr_type == ASN_CONSTR_SEQUENCE) &&
+               (v->marker.flags & EM_OPTIONAL) &&
+               (v->Identifier == NULL)) {
+                sprintf(ext_name, "ext%d", ext_num++);
+                v->Identifier = strdup(ext_name);
+            }
+
             EMBED_WITH_IOCT(v, ioc_tao);
         }
 	}
@@ -390,7 +399,8 @@ asn1c_lang_C_type_SEQUENCE(arg_t *arg) {
 			c_name(arg).base_name);
 	} else {
 		OUT("} %s%s", (expr->marker.flags & EM_INDIRECT)?"*":"",
-			c_name(arg).short_name);
+			arg->embed ? c_name(arg).as_member : c_name(arg).short_name);
+		if(!expr->_anonymous_type) OUT(";\n");
 	}
 
 	return asn1c_lang_C_type_SEQUENCE_def(arg, ioc_tao.ioct ? &ioc_tao : 0);
@@ -415,7 +425,7 @@ asn1c_lang_C_type_SEQUENCE_def(arg_t *arg, asn1c_ioc_table_and_objset_t *opt_ioc
 	asn1p_expr_t *expr = arg->expr;
 	asn1p_expr_t *v;
 	int elements;	/* Number of elements */
-	int first_extension = -1;
+	int first_extension = compute_extensions_start(expr);
 	tag2el_t *tag2el = NULL;
 	int tag2el_count = 0;
 	int tags_count;
@@ -466,7 +476,7 @@ asn1c_lang_C_type_SEQUENCE_def(arg_t *arg, asn1c_ioc_table_and_objset_t *opt_ioc
 		});
 		OUT("};\n");
 
-		if((roms_count + aoms_count) && (arg->flags & (A1C_GEN_OER|A1C_GEN_PER))) {
+		if((roms_count + aoms_count) && (arg->flags & (A1C_GEN_OER | A1C_GEN_UPER | A1C_GEN_APER))) {
 			int elm = 0;
 			int comma = 0;
 			comp_mode = 0;
@@ -568,6 +578,7 @@ asn1c_lang_C_type_SET(arg_t *arg) {
 	const char *id;
 	int comp_mode = 0;	/* {root,ext=1,root,root,...} */
 	int saved_target = arg->target->target;
+	int ext_num = 1;
 
 	DEPENDENCIES;
 
@@ -603,11 +614,20 @@ asn1c_lang_C_type_SET(arg_t *arg) {
 	}
 
 	TQ_FOR(v, &(expr->members), next) {
+		char ext_name[20];
+
 		if(v->expr_type == A1TC_EXTENSIBLE)
 			if(comp_mode < 3) comp_mode++;
 		if(comp_mode == 1)
 			v->marker.flags |= EM_OMITABLE | EM_INDIRECT;
 		try_inline_default(arg, v, 1);
+
+		if((v->expr_type == ASN_CONSTR_SEQUENCE) &&
+		   (v->marker.flags & EM_OPTIONAL) &&
+		   (v->Identifier == NULL)) {
+			sprintf(ext_name, "ext%d", ext_num++);
+			v->Identifier = strdup(ext_name);
+		}
 		EMBED(v);
 	}
 
@@ -632,7 +652,8 @@ asn1c_lang_C_type_SET(arg_t *arg) {
 			c_name(arg).base_name);
 	} else {
 		OUT("} %s%s", (expr->marker.flags & EM_INDIRECT)?"*":"",
-			c_name(arg).short_name);
+			arg->embed ? c_name(arg).as_member : c_name(arg).short_name);
+		if(!expr->_anonymous_type) OUT(";\n");
 	}
 
 	return asn1c_lang_C_type_SET_def(arg);
@@ -860,7 +881,8 @@ asn1c_lang_C_type_SEx_OF(arg_t *arg) {
 			c_name(arg).base_name);
 	} else {
 		OUT("} %s%s", (expr->marker.flags & EM_INDIRECT)?"*":"",
-			c_name(arg).short_name);
+			arg->embed ? c_name(arg).as_member : c_name(arg).short_name);
+		if(!expr->_anonymous_type) OUT(";\n");
 	}
 
 	/*
@@ -949,6 +971,7 @@ asn1c_lang_C_type_CHOICE(arg_t *arg) {
 	asn1p_expr_t *expr = arg->expr;
 	asn1p_expr_t *v;
 	int saved_target = arg->target->target;
+	int ext_num = 1;
 
 	DEPENDENCIES;
 
@@ -957,7 +980,8 @@ asn1c_lang_C_type_CHOICE(arg_t *arg) {
 	OUT("typedef %s {\n", c_name(arg).presence_enum);
 	INDENTED(
 		int skipComma = 1;
-        OUT("%s,\t/* No components present */\n", c_presence_name(arg, 0));
+		OUT("%s", c_presence_name(arg, 0));
+		OUT("%s\t/* No components present */\n", !TQ_FIRST(&(expr->members)) ? "" : ",");
 		TQ_FOR(v, &(expr->members), next) {
 			if(skipComma) skipComma = 0;
 			else if (v->expr_type == A1TC_EXTENSIBLE && !TQ_NEXT(v, next)) OUT("\n");
@@ -967,7 +991,15 @@ asn1c_lang_C_type_CHOICE(arg_t *arg) {
 				skipComma = 1;
 				continue;
 			}
-            OUT("%s", c_presence_name(arg, v));
+
+			if((v->expr_type == ASN_CONSTR_SEQUENCE) &&
+				(v->marker.flags & EM_OPTIONAL) &&
+				(v->Identifier == NULL)) {
+				char ext_name[20];
+				sprintf(ext_name, "ext%d", ext_num++);
+				v->Identifier = strdup(ext_name);
+			}
+			OUT("%s", c_presence_name(arg, v));
 		}
 		OUT("\n");
 	);
@@ -1013,8 +1045,9 @@ asn1c_lang_C_type_CHOICE(arg_t *arg) {
 			c_name(arg).base_name);
 	} else {
 		OUT("} %s%s", (expr->marker.flags & EM_INDIRECT)?"*":"",
-			c_name(arg).short_name);
+			arg->embed ? c_name(arg).as_member : c_name(arg).short_name);
 	}
+	if(!expr->_anonymous_type) OUT(";\n");
 
 	return asn1c_lang_C_type_CHOICE_def(arg);
 }
@@ -1068,8 +1101,13 @@ asn1c_lang_C_OpenType(arg_t *arg, asn1c_ioc_table_and_objset_t *opt_ioc,
         if(!cell->value) continue;
 
         asn1p_expr_t *m = asn1p_expr_clone(cell->value, 0);
-        if (asn1p_lookup_child(open_type_choice, m->Identifier))
-            m->_mark |= TM_SKIPinUNION;
+
+        int n = asn1p_lookup_child_count_by_name(open_type_choice, cell->value->Identifier);
+        if (n) {
+            m->spec_index = n;
+            m->_lineno = -1;
+        }
+
         asn1p_expr_add(open_type_choice, m);
     }
 
@@ -1129,7 +1167,7 @@ asn1c_lang_C_type_CHOICE_def(arg_t *arg) {
 	}
 
     /* Create a canonical elements map */
-    if(elements && (arg->flags & A1C_GEN_PER)) {
+    if(elements && (arg->flags & (A1C_GEN_UPER | A1C_GEN_APER))) {
         cmap = compute_canonical_members_order(arg, elements);
         if(cmap) {
             OUT("static const unsigned asn_MAP_%s_to_canonical_%d[] = {",
@@ -1209,6 +1247,40 @@ asn1c_lang_C_type_CHOICE_def(arg_t *arg) {
 } /* _CHOICE_def() */
 
 int
+asn1c_lang_C_type_REFERENCE_Value(arg_t *arg) {
+	arg_t tmp = *arg;
+	asn1p_expr_t *expr, *ref_type;
+	int saved_target;
+
+	expr = arg->expr;
+	ref_type = WITH_MODULE_NAMESPACE(
+			tmp.expr->module, expr_ns,
+			asn1f_lookup_symbol_ex(tmp.asn, expr_ns, tmp.expr,
+			arg->expr->reference));
+	if(!ref_type)
+		return 0;
+
+	if(!ref_type->data)
+		asn1c_attach_streams(ref_type);
+
+	arg->target = ref_type->data;
+	saved_target = arg->target->target;
+	REDIR(OT_FUNC_DECLS);
+
+	if((ref_type->expr_type == ASN_BASIC_INTEGER) ||
+		(ref_type->expr_type == ASN_BASIC_ENUMERATED)) {
+		OUT("#define %s_", MKID(ref_type));
+		OUT("%s\t", c_name(arg).base_name);
+		OUT("((%s)", asn1c_type_name(arg, expr, TNF_CTYPE));
+		OUT("%s)\n", asn1p_itoa(expr->value->value.v_integer));
+	}
+
+	REDIR(saved_target);
+	arg->target = tmp.target;
+	return 0;
+}
+
+int
 asn1c_lang_C_type_REFERENCE(arg_t *arg) {
 	asn1p_ref_t *ref;
 
@@ -1282,14 +1354,11 @@ asn1c_lang_C_type_SIMPLE_TYPE(arg_t *arg) {
 			}
 		}
 
-		if(!(expr->_mark & TM_SKIPinUNION))
-			OUT("%s", asn1c_type_name(arg, arg->expr, tnfmt));
+		OUT("%s", asn1c_type_name(arg, arg->expr, tnfmt));
 
 		if(!expr->_anonymous_type) {
-			if(!(expr->_mark & TM_SKIPinUNION)) {
-				OUT("%s", (expr->marker.flags&EM_INDIRECT)?"\t*":"\t ");
-				OUT("%s", MKID_safe(expr));
-			}
+			OUT("%s", (expr->marker.flags&EM_INDIRECT)?"\t*":"\t ");
+			OUT("%s;", MKID_safe(expr));
 			if((expr->marker.flags & (EM_DEFAULT & ~EM_INDIRECT))
 					== (EM_DEFAULT & ~EM_INDIRECT))
 				OUT("\t/* DEFAULT %s */",
@@ -1298,18 +1367,20 @@ asn1c_lang_C_type_SIMPLE_TYPE(arg_t *arg) {
 			else if((expr->marker.flags & EM_OPTIONAL)
 					== EM_OPTIONAL)
 				OUT("\t/* OPTIONAL */");
+			OUT("\n");
 		}
 
 	} else {
-		GEN_INCLUDE(asn1c_type_name(arg, expr, TNF_INCLUDE));
+		GEN_POS_INCLUDE_BASE(OT_INCLUDES, expr);
 
 		REDIR(OT_TYPE_DECLS);
 
 		OUT("typedef %s\t",
 			asn1c_type_name(arg, arg->expr, TNF_CTYPE));
-		OUT("%s%s_t",
+		OUT("%s%s_t%s",
 			(expr->marker.flags & EM_INDIRECT)?"*":" ",
-			MKID(expr));
+			MKID(expr),
+			expr->_anonymous_type ? "":";\n");
 	}
 
 	if((expr->expr_type == ASN_BASIC_ENUMERATED)
@@ -1414,7 +1485,7 @@ asn1c_lang_C_type_SIMPLE_TYPE(arg_t *arg) {
                || (expr->expr_type == ASN_BASIC_INTEGER)) {
                 OUT("extern const asn_INTEGER_specifics_t "
                     "asn_SPC_%s_specs_%d;\n",
-                    c_name(arg).base_name, expr->_type_unique_index);
+                    MKID(expr), expr->_type_unique_index);
             } else {
                 asn1p_expr_t *terminal = WITH_MODULE_NAMESPACE(
                     expr->module, expr_ns,
@@ -1426,19 +1497,32 @@ asn1c_lang_C_type_SIMPLE_TYPE(arg_t *arg) {
             }
         }
 		OUT("asn_struct_free_f %s_free;\n", p);
-		OUT("asn_struct_print_f %s_print;\n", p);
+        if(arg->flags & A1C_GEN_PRINT) {
+            OUT("asn_struct_print_f %s_print;\n", p);
+        }
 		OUT("asn_constr_check_f %s_constraint;\n", p);
-		OUT("ber_type_decoder_f %s_decode_ber;\n", p);
-		OUT("der_type_encoder_f %s_encode_der;\n", p);
-		OUT("xer_type_decoder_f %s_decode_xer;\n", p);
-		OUT("xer_type_encoder_f %s_encode_xer;\n", p);
+        if(arg->flags & A1C_GEN_BER) {
+            OUT("ber_type_decoder_f %s_decode_ber;\n", p);
+            OUT("der_type_encoder_f %s_encode_der;\n", p);
+        }
+        if(arg->flags & A1C_GEN_XER) {
+            OUT("xer_type_decoder_f %s_decode_xer;\n", p);
+            OUT("xer_type_encoder_f %s_encode_xer;\n", p);
+        }
+        if(arg->flags & A1C_GEN_JER) {
+            OUT("jer_type_encoder_f %s_encode_jer;\n", p);
+        }
 		if(arg->flags & A1C_GEN_OER) {
-		OUT("oer_type_decoder_f %s_decode_oer;\n", p);
-		OUT("oer_type_encoder_f %s_encode_oer;\n", p);
+			OUT("oer_type_decoder_f %s_decode_oer;\n", p);
+			OUT("oer_type_encoder_f %s_encode_oer;\n", p);
 		}
-		if(arg->flags & A1C_GEN_PER) {
-		OUT("per_type_decoder_f %s_decode_uper;\n", p);
-		OUT("per_type_encoder_f %s_encode_uper;\n", p);
+		if(arg->flags & A1C_GEN_UPER) {
+			OUT("per_type_decoder_f %s_decode_uper;\n", p);
+			OUT("per_type_encoder_f %s_encode_uper;\n", p);
+		}
+		if(arg->flags & A1C_GEN_APER) {
+			OUT("per_type_decoder_f %s_decode_aper;\n", p);
+			OUT("per_type_encoder_f %s_encode_aper;\n", p);
 		}
 	}
 
@@ -2098,6 +2182,7 @@ emit_member_OER_constraints(arg_t *arg, asn1p_expr_t *expr, const char *pfx) {
 
     REDIR(OT_CTDEFS);
 
+    OUT("#if !defined(ASN_DISABLE_OER_SUPPORT)\n");
     OUT("static asn_oer_constraints_t "
         "asn_OER_%s_%s_constr_%d CC_NOTUSED = {\n",
         pfx, MKID(expr), expr->_type_unique_index);
@@ -2129,6 +2214,7 @@ emit_member_OER_constraints(arg_t *arg, asn1p_expr_t *expr, const char *pfx) {
     INDENT(-1);
 
     OUT("};\n");
+    OUT("#endif  /* !defined(ASN_DISABLE_OER_SUPPORT) */\n");
 
     REDIR(save_target);
 
@@ -2143,7 +2229,7 @@ emit_member_PER_constraints(arg_t *arg, asn1p_expr_t *expr, const char *pfx) {
 
 	etype = expr_get_type(arg, expr);
 
-	if((arg->flags & A1C_GEN_PER)
+	if((arg->flags & (A1C_GEN_UPER | A1C_GEN_APER))
 	&& (expr->combined_constraints
 		|| etype == ASN_BASIC_ENUMERATED
 		|| etype == ASN_CONSTR_CHOICE
@@ -2165,6 +2251,7 @@ emit_member_PER_constraints(arg_t *arg, asn1p_expr_t *expr, const char *pfx) {
 
 	REDIR(OT_CTDEFS);
 
+    OUT_NOINDENT("#if !defined(ASN_DISABLE_UPER_SUPPORT) || !defined(ASN_DISABLE_APER_SUPPORT)\n");
 	if(!(expr->_type_referenced)) OUT("static ");
 	OUT("asn_per_constraints_t "
 		"asn_PER_%s_%s_constr_%d CC_NOTUSED = {\n",
@@ -2291,6 +2378,7 @@ emit_member_PER_constraints(arg_t *arg, asn1p_expr_t *expr, const char *pfx) {
 	INDENT(-1);
 
 	OUT("};\n");
+    OUT_NOINDENT("#endif  /* !defined(ASN_DISABLE_UPER_SUPPORT) || !defined(ASN_DISABLE_APER_SUPPORT) */\n");
 
 	REDIR(save_target);
 
@@ -2321,9 +2409,24 @@ emit_default_string_value(arg_t *arg, asn1p_value_t *v) {
 		uint8_t *e = v->value.string.size + b;
 		OUT("{ ");
 		for(;b < e; b++)
-			OUT("0x%02x, ", *b);
+			OUT("0x%02X, ", *b);
 		OUT("0 };\n");
 	}
+}
+
+static void
+emit_default_bitstring_value(arg_t *arg, asn1p_value_t *v) {
+
+	OUT("static const uint8_t defv[] = { ");
+	assert(v->type == ATV_BITVECTOR);
+
+	uint8_t *b = v->value.binary_vector.bits;
+	for (int i = 0; i < (v->value.binary_vector.size_in_bits + 7)/8; i++, b++) {
+		OUT("0x%02X", *b);
+		if(i < (v->value.binary_vector.size_in_bits + 7)/8 - 1)
+			OUT(", ");
+	}
+	OUT(" };\n");
 }
 
 static int
@@ -2421,9 +2524,10 @@ try_inline_default(arg_t *arg, asn1p_expr_t *expr, int out) {
 		//expr->marker.flags &= ~EM_INDIRECT;
 		return 0;
 	default:
-	  if(etype & ASN_STRING_KM_MASK) {
-		if(expr->marker.default_value == NULL
-		|| expr->marker.default_value->type != ATV_STRING)
+	  if(expr->marker.default_value) {
+	    if(!(etype & ASN_STRING_KM_MASK) &&
+		(expr->marker.default_value->type != ATV_STRING) &&
+		(expr->marker.default_value->type != ATV_BITVECTOR))
 			break;
 		if(!out) {
             if(C99_MODE) OUT(".default_value_cmp = ");
@@ -2441,15 +2545,23 @@ try_inline_default(arg_t *arg, asn1p_expr_t *expr, int out) {
         OUT("static int asn_DFL_%d_cmp(const void *sptr) {\n",
             expr->_type_unique_index);
         INDENT(+1);
-        emit_default_string_value(arg, expr->marker.default_value);
+	if(expr->marker.default_value->type == ATV_STRING)
+		emit_default_string_value(arg, expr->marker.default_value);
+	else
+		emit_default_bitstring_value(arg, expr->marker.default_value);
         OUT("const %s *st = sptr;\n", asn1c_type_name(arg, expr, TNF_CTYPE));
         OUT("\n");
         OUT("if(!st) {\n");
         OUT("\treturn -1; /* No value is not a default value */\n");
         OUT("}\n");
 		OUT("\n");
-        OUT("if(st->size == (sizeof(defv) - 1)\n");
-        OUT("&& memcmp(st->buf, &defv, sizeof(defv) - 1) == 0)\n");
+	if(expr->marker.default_value->type == ATV_STRING) {
+		OUT("if(st->size == (sizeof(defv) - 1)\n");
+		OUT("&& memcmp(st->buf, &defv, sizeof(defv) - 1) == 0)\n");
+	} else {
+		OUT("if(st->size == (sizeof(defv))\n");
+		OUT("&& memcmp(st->buf, &defv, sizeof(defv)) == 0)\n");
+	}
         OUT("\treturn 0;\n");
         OUT("return 1;\n");
 		INDENT(-1);
@@ -2458,7 +2570,10 @@ try_inline_default(arg_t *arg, asn1p_expr_t *expr, int out) {
         OUT("static int asn_DFL_%d_set(void **sptr) {\n",
             expr->_type_unique_index);
         INDENT(+1);
-		emit_default_string_value(arg, expr->marker.default_value);
+        if(expr->marker.default_value->type == ATV_STRING)
+            emit_default_string_value(arg, expr->marker.default_value);
+        else
+            emit_default_bitstring_value(arg, expr->marker.default_value);
 		OUT("%s *st = *sptr;\n", asn1c_type_name(arg, expr, TNF_CTYPE));
         OUT("uint8_t *nstr = MALLOC(sizeof(defv));\n");
 		OUT("\n");
@@ -2472,7 +2587,13 @@ try_inline_default(arg_t *arg, asn1p_expr_t *expr, int out) {
 		OUT("\tif(!st) { FREEMEM(nstr); return -1; }\n");
 		OUT("}\n");
 		OUT("st->buf = nstr;\n");
-        OUT("st->size = sizeof(defv) - 1;\n");
+      if(expr->marker.default_value->type == ATV_STRING) {
+          OUT("st->size = sizeof(defv) - 1;\n");
+      } else {
+          OUT("st->size = sizeof(defv);\n");
+          if(etype == ASN_BASIC_BIT_STRING)
+              OUT("st->bits_unused = %d;\n", (8 - expr->marker.default_value->value.binary_vector.size_in_bits % 8) % 8);
+      }
 		OUT("\n");
 		OUT("return 0;\n");
 		INDENT(-1);
@@ -2667,7 +2788,7 @@ emit_member_type_selector(arg_t *arg, asn1p_expr_t *expr, asn1c_ioc_table_and_ob
         opt_ioc->objset->_type_unique_index);
     OUT("size_t constraining_column = %zu; /* %s */\n", constraining_column, cfield);
     OUT("size_t for_column = %zu; /* %s */\n", for_column, for_field);
-    OUT("size_t row;\n");
+    OUT("size_t row, presence_index = 0;\n");
 
     const char *tname = asn1c_type_name(arg, constraining_memb, TNF_SAFE);
     if(constraining_memb->marker.flags & EM_INDIRECT) {
@@ -2702,9 +2823,13 @@ emit_member_type_selector(arg_t *arg, asn1p_expr_t *expr, asn1c_ioc_table_and_ob
     OUT("    const asn_ioc_cell_t *constraining_cell = &itable->rows[row * itable->columns_count + constraining_column];\n");
     OUT("    const asn_ioc_cell_t *type_cell = &itable->rows[row * itable->columns_count + for_column];\n");
     OUT("\n");
+    OUT("    if(type_cell->cell_kind == aioc__undefined)\n");
+    OUT("        continue;\n");
+    OUT("\n");
+    OUT("    presence_index++;\n");
     OUT("    if(constraining_cell->type_descriptor->op->compare_struct(constraining_cell->type_descriptor, constraining_value, constraining_cell->value_sptr) == 0) {\n");
     OUT("        result.type_descriptor = type_cell->type_descriptor;\n");
-    OUT("        result.presence_index = row + 1;\n");
+    OUT("        result.presence_index = presence_index;\n");
     OUT("        break;\n");
     OUT("    }\n");
     OUT("}\n");
@@ -2831,7 +2956,9 @@ emit_member_table(arg_t *arg, asn1p_expr_t *expr, asn1c_ioc_table_and_objset_t *
     }
 	OUT(",\n");
 
-    OUT("{ ");
+    OUT("{\n");
+    INDENT(+1);
+    OUT_NOINDENT("#if !defined(ASN_DISABLE_OER_SUPPORT)\n");
 	if(C99_MODE) OUT(".oer_constraints = ");
 	if(arg->flags & A1C_GEN_OER) {
 		if(expr->constraints) {
@@ -2844,9 +2971,11 @@ emit_member_table(arg_t *arg, asn1p_expr_t *expr, asn1c_ioc_table_and_objset_t *
 	} else {
         OUT("0");
 	}
-    OUT(", ");
+    OUT(",\n");
+    OUT_NOINDENT("#endif  /* !defined(ASN_DISABLE_OER_SUPPORT) */\n");
+    OUT_NOINDENT("#if !defined(ASN_DISABLE_UPER_SUPPORT) || !defined(ASN_DISABLE_APER_SUPPORT)\n");
 	if(C99_MODE) OUT(".per_constraints = ");
-	if(arg->flags & A1C_GEN_PER) {
+	if(arg->flags & (A1C_GEN_UPER | A1C_GEN_APER)) {
 		if(expr->constraints) {
 			OUT("&asn_PER_memb_%s_constr_%d",
 				MKID(expr),
@@ -2857,23 +2986,25 @@ emit_member_table(arg_t *arg, asn1p_expr_t *expr, asn1c_ioc_table_and_objset_t *
 	} else {
 		OUT("0");
 	}
-    OUT(", ");
+    OUT(",\n");
+    OUT_NOINDENT("#endif  /* !defined(ASN_DISABLE_UPER_SUPPORT) || !defined(ASN_DISABLE_APER_SUPPORT) */\n");
 	if(C99_MODE) OUT(".general_constraints = ");
 	if(expr->constraints) {
 		if(arg->flags & A1C_NO_CONSTRAINTS) {
-			OUT("0");
+			OUT("0\n");
 		} else {
 			const char *id = MKID(expr);
 			if(expr->_anonymous_type
 					&& !strcmp(expr->Identifier, "Member"))
 				id = asn1c_type_name(arg, expr, TNF_SAFE);
-			OUT(" memb_%s_constraint_%d", id,
+			OUT("memb_%s_constraint_%d\n", id,
 				arg->expr->_type_unique_index);
 		}
 	} else {
-		OUT("0");
+		OUT("0\n");
 	}
-    OUT(" },\n");
+    INDENT(-1);
+    OUT("},\n");
 
 	if(try_inline_default(arg, expr, 0)) {
 	} else {
@@ -3013,7 +3144,9 @@ emit_type_DEF(arg_t *arg, asn1p_expr_t *expr, enum tvm_compat tv_mode, int tags_
 			OUT("0,\t/* No tags (count) */\n");
 		}
 
-		OUT("{ ");
+		OUT("{\n");
+        INDENT(+1);
+        OUT_NOINDENT("#if !defined(ASN_DISABLE_OER_SUPPORT)\n");
 		if(arg->flags & A1C_GEN_OER) {
 			if(expr->combined_constraints
 			|| expr->expr_type == ASN_BASIC_ENUMERATED
@@ -3026,9 +3159,10 @@ emit_type_DEF(arg_t *arg, asn1p_expr_t *expr, enum tvm_compat tv_mode, int tags_
 		} else {
 			OUT("0");
 		}
-        OUT(", ");
-
-		if(arg->flags & A1C_GEN_PER) {
+        OUT(",\n");
+        OUT_NOINDENT("#endif  /* !defined(ASN_DISABLE_OER_SUPPORT) */\n");
+        OUT_NOINDENT("#if !defined(ASN_DISABLE_UPER_SUPPORT) || !defined(ASN_DISABLE_APER_SUPPORT)\n");
+		if(arg->flags & (A1C_GEN_UPER | A1C_GEN_APER)) {
             if(expr->combined_constraints
                || expr->expr_type == ASN_BASIC_ENUMERATED
                || expr->expr_type == ASN_CONSTR_CHOICE
@@ -3041,7 +3175,8 @@ emit_type_DEF(arg_t *arg, asn1p_expr_t *expr, enum tvm_compat tv_mode, int tags_
 		} else {
 			OUT("0");
 		}
-		OUT(", ");
+        OUT(",\n");
+        OUT_NOINDENT("#endif  /* !defined(ASN_DISABLE_UPER_SUPPORT) || !defined(ASN_DISABLE_APER_SUPPORT) */\n");
 #define FUNCREF(foo)                              \
     do {                                          \
         OUT("%s", p);                             \
@@ -3064,7 +3199,9 @@ emit_type_DEF(arg_t *arg, asn1p_expr_t *expr, enum tvm_compat tv_mode, int tags_
 			else
 				FUNCREF(constraint);
 		}
-        OUT(" },\n");
+        OUT("\n");
+        INDENT(-1);
+        OUT("},\n");
 
         free(p);
         p = NULL;
@@ -3232,13 +3369,8 @@ emit_include_dependencies(arg_t *arg) {
 		if((!(memb->expr_type & ASN_CONSTR_MASK)
 			&& memb->expr_type > ASN_CONSTR_MASK)
 		|| memb->meta_type == AMT_TYPEREF) {
-			if(memb->marker.flags & EM_UNRECURSE) {
-				GEN_POSTINCLUDE(asn1c_type_name(arg,
-					memb, TNF_INCLUDE));
-			} else {
-				GEN_INCLUDE(asn1c_type_name(arg,
-					memb, TNF_INCLUDE));
-			}
+			GEN_POS_INCLUDE_BASE((memb->marker.flags & EM_UNRECURSE) ?
+					OT_POST_INCLUDE : OT_INCLUDES, memb);
 		}
 	}
 

@@ -31,14 +31,14 @@ asn1p_module_t *asn1f_lookup_in_imports(arg_t *arg, asn1p_module_t *mod, const c
  */
 asn1p_module_t *asn1f_lookup_module(arg_t *arg,
 		const char *module_name,
-		const asn1p_oid_t *module_oid);
+		const asn1p_oid_t *module_oid, int oid_option);
 
 /*
  * Return the reference to a destination of the given reference,
  * symbol lookup. Not a recursive function.
  */
 asn1p_expr_t *asn1f_lookup_symbol(arg_t *arg, asn1p_expr_t *rhs_pspecs,
-                                  const asn1p_ref_t *ref);
+                                  asn1p_ref_t *ref);
 
 /*
  * Recursively find the original type for the given expression.
@@ -62,7 +62,7 @@ asn1p_expr_t *asn1f_find_terminal_type(arg_t *arg, asn1p_expr_t *tc);
  * 	value Type2 ::= value2
  * 	value2 Type3 ::= 3
  * Then this function will return the expression for value2 if given
- * the v as an argment.
+ * the v as an argument.
  */
 asn1p_expr_t *asn1f_find_terminal_value(arg_t *arg, asn1p_expr_t *tc);
 

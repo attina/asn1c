@@ -54,6 +54,43 @@ static int pdu_collection_has_unused_types(arg_t *arg);
 static const char *generate_pdu_C_definition(void);
 static void asn1c__cleanup_pdu_type(void);
 static int asn1c__pdu_type_lookup(const char *typename);
+static int generate_constant_file(arg_t *arg, const char *destdir);
+
+static int
+asn1c__save_asn_config(arg_t *arg, const char *destdir,
+                       const char *cfgfile_name) {
+    FILE *mkf;
+
+    mkf = asn1c_open_file(destdir, cfgfile_name, "", 0);
+    if(mkf == NULL) {
+        perror(cfgfile_name);
+        return -1;
+    }
+
+    safe_fprintf(mkf, "// Generated automatically. Don't edit manually!\n\n");
+
+    if(!(arg->flags & A1C_GEN_BER))
+        safe_fprintf(mkf, "#define ASN_DISABLE_BER_SUPPORT 1\n");
+    if(!(arg->flags & A1C_GEN_XER))
+        safe_fprintf(mkf, "#define ASN_DISABLE_XER_SUPPORT 1\n");
+    if(!(arg->flags & A1C_GEN_OER))
+        safe_fprintf(mkf, "#define ASN_DISABLE_OER_SUPPORT 1\n");
+    if(!(arg->flags & A1C_GEN_UPER))
+        safe_fprintf(mkf, "#define ASN_DISABLE_UPER_SUPPORT 1\n");
+    if(!(arg->flags & A1C_GEN_APER))
+        safe_fprintf(mkf, "#define ASN_DISABLE_APER_SUPPORT 1\n");
+    if(!(arg->flags & A1C_GEN_PRINT))
+        safe_fprintf(mkf, "#define ASN_DISABLE_PRINT_SUPPORT 1\n");
+    if(!(arg->flags & A1C_GEN_RFILL))
+        safe_fprintf(mkf, "#define ASN_DISABLE_RFILL_SUPPORT 1\n");
+    if(!(arg->flags & A1C_GEN_JER))
+        safe_fprintf(mkf, "#define ASN_DISABLE_JER_SUPPORT 1\n");
+
+    fclose(mkf);
+    safe_fprintf(stderr, "Generated %s%s\n", destdir, cfgfile_name);
+
+    return 0;
+}
 
 static int
 asn1c__save_library_makefile(arg_t *arg, const asn1c_dep_chainset *deps,
@@ -72,9 +109,10 @@ asn1c__save_library_makefile(arg_t *arg, const asn1c_dep_chainset *deps,
 	TQ_FOR(mod, &(arg->asn->modules), mod_next) {
 		TQ_FOR(arg->expr, &(mod->members), next) {
 			if(asn1_lang_map[arg->expr->meta_type]
-				[arg->expr->expr_type].type_cb) {
+				[arg->expr->expr_type].type_cb &&
+				(arg->expr->meta_type != AMT_VALUE)) {
 				safe_fprintf(mkf, "\t\\\n\t%s%s.c", destdir,
-				asn1c_make_identifier(AMI_MASK_ONLY_SPACES, arg->expr, 0));
+				asn1c_make_identifier(AMI_MASK_ONLY_SPACES | AMI_USE_PREFIX, arg->expr, 0));
 			}
 		}
 	}
@@ -82,10 +120,11 @@ asn1c__save_library_makefile(arg_t *arg, const asn1c_dep_chainset *deps,
 	TQ_FOR(mod, &(arg->asn->modules), mod_next) {
 		TQ_FOR(arg->expr, &(mod->members), next) {
 			if(asn1_lang_map[arg->expr->meta_type]
-				[arg->expr->expr_type].type_cb) {
+				[arg->expr->expr_type].type_cb &&
+				(arg->expr->meta_type != AMT_VALUE)) {
                 safe_fprintf(
                     mkf, "\t\\\n\t%s%s.h", destdir,
-                    asn1c_make_identifier(AMI_MASK_ONLY_SPACES, arg->expr, 0));
+                    asn1c_make_identifier(AMI_MASK_ONLY_SPACES | AMI_USE_PREFIX, arg->expr, 0));
             }
 		}
 	}
@@ -145,9 +184,15 @@ asn1c__save_library_makefile(arg_t *arg, const asn1c_dep_chainset *deps,
 	safe_fprintf(
 		mkf,
 		"\n"
-		"ASN_MODULE_CFLAGS=%s%s",
+		"ASN_MODULE_CFLAGS=%s%s%s%s%s%s%s",
+		(arg->flags & A1C_GEN_BER) ? "" : "-DASN_DISABLE_BER_SUPPORT ",
+		(arg->flags & A1C_GEN_XER) ? "" : "-DASN_DISABLE_XER_SUPPORT ",
 		(arg->flags & A1C_GEN_OER) ? "" : "-DASN_DISABLE_OER_SUPPORT ",
-		(arg->flags & A1C_GEN_PER) ? "" : "-DASN_DISABLE_PER_SUPPORT ");
+		(arg->flags & A1C_GEN_UPER) ? "" : "-DASN_DISABLE_UPER_SUPPORT ",
+		(arg->flags & A1C_GEN_APER) ? "" : "-DASN_DISABLE_APER_SUPPORT ",
+		(arg->flags & A1C_GEN_PRINT) ? "" : "-DASN_DISABLE_PRINT_SUPPORT ",
+		(arg->flags & A1C_GEN_RFILL) ? "" : "-DASN_DISABLE_RFILL_SUPPORT ",
+		(arg->flags & A1C_GEN_JER) ? "" : "-DASN_DISABLE_JER_SUPPORT ");
 
 	safe_fprintf(
 		mkf,
@@ -183,12 +228,19 @@ asn1c__save_example_mk_makefile(arg_t *arg, const asn1c_dep_chainset *deps,
         mkf,
         "include %s%s\n\n"
         "LIBS += -lm\n"
-        "CFLAGS += $(ASN_MODULE_CFLAGS) %s%s-I.\n"
+        "CFLAGS += $(ASN_MODULE_CFLAGS) %s%s%s%s%s%s%s%s%s-I.\n"
         "ASN_LIBRARY ?= libasncodec.a\n"
         "ASN_PROGRAM ?= converter-example\n"
         "ASN_PROGRAM_SRCS ?= ",
         destdir, library_makefile_name,
         (arg->flags & A1C_PDU_TYPE) ? generate_pdu_C_definition() : "",
+        (arg->flags & A1C_GEN_BER) ? "": "-DASN_DISABLE_BER_SUPPORT ",
+        (arg->flags & A1C_GEN_XER) ? "": "-DASN_DISABLE_XER_SUPPORT ",
+        (arg->flags & A1C_GEN_OER) ? "": "-DASN_DISABLE_OER_SUPPORT ",
+        (arg->flags & A1C_GEN_UPER) ? "": "-DASN_DISABLE_UPER_SUPPORT ",
+        (arg->flags & A1C_GEN_APER) ? "": "-DASN_DISABLE_APER_SUPPORT ",
+        (arg->flags & A1C_GEN_PRINT) ? "": "-DASN_DISABLE_PRINT_SUPPORT ",
+        (arg->flags & A1C_GEN_RFILL) ? "": "-DASN_DISABLE_RFILL_SUPPORT ",
         need_to_generate_pdu_collection(arg) ? "-DASN_PDU_COLLECTION " : "");
 
     if(dlist) {
@@ -214,26 +266,25 @@ asn1c__save_example_mk_makefile(arg_t *arg, const asn1c_dep_chainset *deps,
         }
     }
 
-    safe_fprintf(
-        mkf,
-        "\n\nall: $(ASN_PROGRAM)\n"
-        "\n$(ASN_PROGRAM): $(ASN_LIBRARY) $(ASN_PROGRAM_SRCS:.c=.o)"
-        "\n\t$(CC) $(CFLAGS) $(CPPFLAGS) -o $(ASN_PROGRAM) "
-        "$(ASN_PROGRAM_SRCS:.c=.o) $(LDFLAGS) $(ASN_LIBRARY) $(LIBS)\n"
-        "\n$(ASN_LIBRARY): $(ASN_MODULE_SRCS:.c=.o)"
-        "\n\t$(AR) rcs $@ $(ASN_MODULE_SRCS:.c=.o)\n"
-        "\n.SUFFIXES:"
-        "\n.SUFFIXES: .c .o\n"
-        "\n.c.o:"
-        "\n\t$(CC) $(CFLAGS) -o $@ -c $<\n"
-        "\nclean:"
-        "\n\trm -f $(ASN_PROGRAM) $(ASN_LIBRARY)"
-        "\n\trm -f $(ASN_MODULE_SRCS:.c=.o) $(ASN_PROGRAM_SRCS:.c=.o)\n"
-        "\nregen: regenerate-from-asn1-source\n"
-        "\nregenerate-from-asn1-source:\n\t");
+	safe_fprintf(
+		mkf,
+		"\n\nall: $(ASN_PROGRAM)\n"
+		"\n$(ASN_PROGRAM): $(ASN_LIBRARY) $(ASN_PROGRAM_SRCS:.c=.o)"
+		"\n\t$(CC) $(CFLAGS) $(CPPFLAGS) -o $(ASN_PROGRAM) "
+		"$(ASN_PROGRAM_SRCS:.c=.o) $(LDFLAGS) $(ASN_LIBRARY) $(LIBS)\n"
+		"\n$(ASN_LIBRARY): $(ASN_MODULE_SRCS:.c=.o)"
+		"\n\t$(AR) rcs $@ $(ASN_MODULE_SRCS:.c=.o)\n"
+		"\n%%.o: %%.c"
+		"\n\t$(CC) $(CFLAGS) -o $@ -c $<\n"
+		"\nclean:"
+		"\n\trm -f $(ASN_PROGRAM) $(ASN_LIBRARY)"
+		"\n\trm -f $(ASN_MODULE_SRCS:.c=.o) $(ASN_PROGRAM_SRCS:.c=.o)\n"
+		"\nregen: regenerate-from-asn1-source\n"
+		"\nregenerate-from-asn1-source:\n\t");
 
-    for(int i = 0; i < argc; i++)
+    for(int i = 0; i < argc; i++) {
         safe_fprintf(mkf, "%s%s", i ? " " : "", argv[i]);
+    }
     safe_fprintf(mkf, "\n\n");
 
     fclose(mkf);
@@ -258,12 +309,20 @@ asn1c__save_example_am_makefile(arg_t *arg, const asn1c_dep_chainset *deps, cons
 	safe_fprintf(mkf,
 	             "include %s%s\n\n"
 	             "bin_PROGRAMS += asn1convert\n"
-	             "asn1convert_CFLAGS = $(ASN_MODULE_CFLAGS) %s%s\n"
+	             "asn1convert_CFLAGS = $(ASN_MODULE_CFLAGS) %s%s%s%s%s%s%s%s%s\n"
 	             "asn1convert_CPPFLAGS = -I$(top_srcdir)/%s\n"
 	             "asn1convert_LDADD = libasncodec.la\n"
 	             "asn1convert_SOURCES = ",
 	             destdir, library_makefile_name,
 	             (arg->flags & A1C_PDU_TYPE) ? generate_pdu_C_definition() : "",
+                 (arg->flags & A1C_GEN_BER) ? "": "-DASN_DISABLE_BER_SUPPORT ",
+                 (arg->flags & A1C_GEN_XER) ? "": "-DASN_DISABLE_XER_SUPPORT ",
+                 (arg->flags & A1C_GEN_OER) ? "": "-DASN_DISABLE_OER_SUPPORT ",
+                 (arg->flags & A1C_GEN_UPER) ? "": "-DASN_DISABLE_UPER_SUPPORT ",
+                 (arg->flags & A1C_GEN_APER) ? "": "-DASN_DISABLE_APER_SUPPORT ",
+                 (arg->flags & A1C_GEN_PRINT) ? "": "-DASN_DISABLE_PRINT_SUPPORT ",
+                 (arg->flags & A1C_GEN_RFILL) ? "": "-DASN_DISABLE_RFILL_SUPPORT ",
+                 (arg->flags & A1C_GEN_JER) ? "": "-DASN_DISABLE_JER_SUPPORT ",
 	             need_to_generate_pdu_collection(arg) ? "-DASN_PDU_COLLECTION " : "", destdir);
 
 	if(dlist) {
@@ -371,6 +430,7 @@ asn1c_save_compiled_output(arg_t *arg, const char *datadir, const char *destdir,
     const char* example_am_makefile = "Makefile.am.asn1convert";
     const char* program_makefile = "converter-example.mk";
     const char* library_makefile = "Makefile.am.libasncodec";
+    const char* cfgfile_name = "asn_config.h";
 
     /*
      * Early check that we can properly generate PDU collection.
@@ -394,7 +454,8 @@ asn1c_save_compiled_output(arg_t *arg, const char *datadir, const char *destdir,
         TQ_FOR(mod, &(arg->asn->modules), mod_next) {
             TQ_FOR(arg->expr, &(mod->members), next) {
                 if(asn1_lang_map[arg->expr->meta_type][arg->expr->expr_type]
-                       .type_cb) {
+                       .type_cb &&
+                   (arg->expr->meta_type != AMT_VALUE)) {
                     ret = asn1c_dump_streams(arg, deps, destdir, optc, argv);
                     if(ret) break;
                 }
@@ -410,6 +471,9 @@ asn1c_save_compiled_output(arg_t *arg, const char *datadir, const char *destdir,
             break;
         }
 
+        if(ret) break;
+
+        ret = asn1c__save_asn_config(arg, destdir, cfgfile_name);
         if(ret) break;
 
         ret = asn1c__save_library_makefile(arg, deps, datadir, destdir,
@@ -435,6 +499,8 @@ asn1c_save_compiled_output(arg_t *arg, const char *datadir, const char *destdir,
 
     asn1c_dep_chainset_free(deps);
     asn1c__cleanup_pdu_type();
+
+    generate_constant_file(arg, destdir);
 
     return ret;
 }
@@ -495,7 +561,8 @@ asn1c_save_streams(arg_t *arg, asn1c_dep_chainset *deps, const char *destdir,
 		return -1;
 	}
 
-	filename = strdup(asn1c_make_identifier(AMI_MASK_ONLY_SPACES, expr, (char*)0));
+	filename = strdup(asn1c_make_identifier(AMI_MASK_ONLY_SPACES | AMI_USE_PREFIX,
+						expr, (char*)0));
 	fp_c = asn1c_open_file(destdir, filename, ".c", &tmpname_c);
     if(fp_c == NULL) {
         return -1;
@@ -511,7 +578,7 @@ asn1c_save_streams(arg_t *arg, asn1c_dep_chainset *deps, const char *destdir,
 	generate_preamble(arg, fp_c, optc, argv);
 	generate_preamble(arg, fp_h, optc, argv);
 
-	header_id = asn1c_make_identifier(0, expr, NULL);
+	header_id = asn1c_make_identifier(AMI_USE_PREFIX, expr, NULL);
 	safe_fprintf(fp_h,
 		"#ifndef\t_%s_H_\n"
 		"#define\t_%s_H_\n"
@@ -535,7 +602,7 @@ asn1c_save_streams(arg_t *arg, asn1c_dep_chainset *deps, const char *destdir,
 	SAVE_STREAM(fp_h, OT_DEPS,	"Dependencies", 0);
 	SAVE_STREAM(fp_h, OT_FWD_DECLS,	"Forward declarations", 0);
 	SAVE_STREAM(fp_h, OT_FWD_DEFS,	"Forward definitions", 0);
-	SAVE_STREAM(fp_h, OT_TYPE_DECLS, expr->Identifier, 0);
+	SAVE_STREAM(fp_h, OT_TYPE_DECLS, filename, 0);
 	SAVE_STREAM(fp_h, OT_FUNC_DECLS,"Implementation", 0);
 	safe_fprintf(fp_h, "\n#ifdef __cplusplus\n}\n#endif\n");
 
@@ -791,7 +858,7 @@ generate_pdu_collection(arg_t *arg) {
             abuf_printf(buf,
                         "extern struct asn_TYPE_descriptor_s "
                         "asn_DEF_%s;\n",
-                        asn1c_make_identifier(0, arg->expr, NULL));
+                        asn1c_make_identifier(AMI_USE_PREFIX, arg->expr, NULL));
         }
     }
 
@@ -816,7 +883,7 @@ generate_pdu_collection(arg_t *arg) {
                              arg->expr->module->source_file_name);
             }
             abuf_printf(buf, "\t&asn_DEF_%s,\t\n",
-                         asn1c_make_identifier(0, arg->expr, NULL));
+                         asn1c_make_identifier(AMI_USE_PREFIX, arg->expr, NULL));
         }
     }
 
@@ -924,7 +991,8 @@ pdu_collection_has_unused_types(arg_t *arg) {
 
 static enum include_type_result
 include_type_to_pdu_collection(arg_t *arg) {
-    if(!asn1_lang_map[arg->expr->meta_type][arg->expr->expr_type].type_cb)
+    if(!asn1_lang_map[arg->expr->meta_type][arg->expr->expr_type].type_cb ||
+        (arg->expr->meta_type == AMT_VALUE))
         return 0;
 
     /* Parameterized types can't serve as PDU's without instantiation. */
@@ -942,5 +1010,86 @@ include_type_to_pdu_collection(arg_t *arg) {
         return 1;
     }
 
+    return 0;
+}
+
+static abuf *
+generate_constant_collection(arg_t *arg) {
+    asn1p_module_t *mod;
+    abuf *buf = abuf_new();
+    int empty_file = 1;
+
+    abuf_printf(buf, "/*\n * Generated by asn1c-" VERSION
+                     " (http://lionet.info/asn1c)\n */\n\n");
+    abuf_printf(buf, "#ifndef _%sASN_CONSTANT_H\n#define _%sASN_CONSTANT_H\n\n", asn1c_prefix(), asn1c_prefix());
+
+    abuf_printf(buf, "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n");
+
+    TQ_FOR(mod, &(arg->asn->modules), mod_next) {
+        TQ_FOR(arg->expr, &(mod->members), next) {
+            if(arg->expr->expr_type != ASN_BASIC_INTEGER)
+                continue;
+
+            if(arg->expr->meta_type == AMT_VALUE) {
+                abuf_printf(buf, "#define %s (%s)\n",
+                            asn1c_make_identifier(AMI_USE_PREFIX, arg->expr, 0),
+                            asn1p_itoa(arg->expr->value->value.v_integer));
+                empty_file = 0;
+            }
+
+            if(arg->expr->meta_type == AMT_TYPE) {
+                if(arg->expr->constraints) {
+                    if(arg->expr->constraints->el_count == 1 &&
+                       arg->expr->constraints->elements[0]->type == ACT_EL_RANGE) {
+                        abuf_printf(buf, "#define min_val_%s (%s)\n",
+                                    asn1c_make_identifier(AMI_USE_PREFIX, arg->expr, 0),
+                                    asn1p_itoa(arg->expr->constraints->elements[0]->range_start->value.v_integer));
+                        abuf_printf(buf, "#define max_val_%s (%s)\n",
+                                    asn1c_make_identifier(AMI_USE_PREFIX, arg->expr, 0),
+                                    asn1p_itoa(arg->expr->constraints->elements[0]->range_stop->value.v_integer));
+                        empty_file = 0;
+                    } 
+                }
+            }
+        }
+    }
+
+    abuf_printf(buf, "\n\n#ifdef __cplusplus\n}\n#endif\n\n#endif /* _%sASN_CONSTANT_H */\n", asn1c_prefix());
+
+    if(empty_file) {
+        abuf_free(buf);
+        return 0;
+    }
+    return buf;
+}
+
+static int
+generate_constant_file(arg_t *arg, const char *destdir) {
+    abuf *buf = generate_constant_collection(arg);
+    char *filename;
+    int filename_len;
+
+    if(!buf) return 0;
+
+    filename_len = strlen(asn1c_prefix()) + strlen("asn_constant");
+    filename = calloc(filename_len + 1, 1);
+    snprintf(filename, filename_len + 1, "%sasn_constant", asn1c_prefix());
+
+    if(arg->flags & A1C_PRINT_COMPILED) {
+        printf("\n/*** <<< asn_constant.h >>> ***/\n\n");
+        safe_fwrite(buf->buffer, buf->length, 1, stdout);
+    } else {
+
+        FILE *fp = asn1c_open_file(destdir, filename, ".h", 0);
+        if(fp == NULL) {
+            perror("asn_constant.h");
+            return -1;
+        }
+        safe_fwrite(buf->buffer, buf->length, 1, fp);
+        fclose(fp);
+    }
+    safe_fprintf(stderr, "Generated %s.h\n", filename);
+    free(filename);
+    abuf_free(buf);
     return 0;
 }

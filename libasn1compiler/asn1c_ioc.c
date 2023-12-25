@@ -5,13 +5,13 @@
 #include <asn1fix_export.h>
 #include <asn1print.h>
 
-#define MKID(expr) asn1c_make_identifier(0, (expr), 0)
+#define MKID(expr) asn1c_make_identifier(AMI_USE_PREFIX, (expr), 0)
 
 /*
  * Given the table constraint or component relation constraint
  * ({ObjectSetName}{...}) returns "ObjectSetName" as a reference.
  */
-const asn1p_ref_t *
+asn1p_ref_t *
 asn1c_get_information_object_set_reference_from_constraint(arg_t *arg,
     const asn1p_constraint_t *ct) {
 
@@ -68,14 +68,14 @@ asn1c_get_ioc_table(arg_t *arg) {
     asn1p_expr_t *expr = arg->expr;
 	asn1p_expr_t *memb;
     asn1p_expr_t *objset = 0;
-    const asn1p_ref_t *objset_ref = NULL;
+    asn1p_ref_t *objset_ref = NULL;
     asn1c_ioc_table_and_objset_t safe_ioc_tao = {0, 0, 0};
     asn1c_ioc_table_and_objset_t failed_ioc_tao = { 0, 0, 1 };
 
     TQ_FOR(memb, &(expr->members), next) {
         const asn1p_constraint_t *cr_ct =
             asn1p_get_component_relation_constraint(memb->constraints);
-        const asn1p_ref_t *tmpref =
+        asn1p_ref_t *tmpref =
             asn1c_get_information_object_set_reference_from_constraint(arg,
                                                                        cr_ct);
         if(tmpref) {
@@ -225,6 +225,9 @@ emit_ioc_cell(arg_t *arg, struct asn1p_ioc_cell_s *cell) {
     } else if(cell->value->meta_type == AMT_TYPEREF) {
         GEN_INCLUDE(asn1c_type_name(arg, cell->value, TNF_INCLUDE));
         OUT("aioc__type, &asn_DEF_%s", MKID(cell->value));
+    } else if(cell->value->meta_type == AMT_TYPE) {
+        GEN_INCLUDE(asn1c_type_name(arg, cell->value, TNF_INCLUDE));
+        OUT("aioc__type, &asn_DEF_%s", asn1c_type_name(arg, cell->value, TNF_SAFE));
     } else {
         return -1;
     }
@@ -256,6 +259,9 @@ emit_ioc_table(arg_t *arg, asn1p_expr_t *context, asn1c_ioc_table_and_objset_t i
         }
     }
 
+    if(ioc_tao.ioct->rows == 0)
+        return 0;
+
     /* Emit the Information Object Set */
     OUT("static const asn_ioc_cell_t asn_IOS_%s_%d_rows[] = {\n",
         MKID(ioc_tao.objset), ioc_tao.objset->_type_unique_index);
@@ -282,7 +288,7 @@ emit_ioc_table(arg_t *arg, asn1p_expr_t *context, asn1c_ioc_table_and_objset_t i
     OUT("static const asn_ioc_set_t asn_IOS_%s_%d[] = {\n",
         MKID(ioc_tao.objset), ioc_tao.objset->_type_unique_index);
     INDENT(+1);
-    OUT("%zu, %zu, asn_IOS_%s_%d_rows\n", ioc_tao.ioct->rows, columns,
+    OUT("{ %zu, %zu, asn_IOS_%s_%d_rows }\n", ioc_tao.ioct->rows, columns,
         MKID(ioc_tao.objset), ioc_tao.objset->_type_unique_index);
     INDENT(-1);
     OUT("};\n");

@@ -57,6 +57,12 @@ asn1p_expr_compare(const asn1p_expr_t *a, const asn1p_expr_t *b) {
         return -1;
     }
 
+    if((!a->constraints && b->constraints) || (a->constraints && !b->constraints)) {
+        return -1;
+    } else if(a->constraints && asn1p_constraint_compare(a->constraints, b->constraints)) {
+        return -1;
+    }
+
     if((a->tag.tag_class != b->tag.tag_class)
        || (a->tag.tag_mode != b->tag.tag_mode)
        || (a->tag.tag_value != b->tag.tag_value)) {
@@ -325,6 +331,21 @@ asn1p_lookup_child(asn1p_expr_t *tc, const char *name) {
 
 	errno = ESRCH;
 	return NULL;
+}
+
+int
+asn1p_lookup_child_count_by_name(asn1p_expr_t *tc, const char *name) {
+	asn1p_expr_t *child_tc;
+	int count = 0;
+
+	TQ_FOR(child_tc, &(tc->members), next) {
+		if(child_tc->Identifier
+		&& strcmp(child_tc->Identifier, name) == 0) {
+			count++;
+		}
+	}
+
+	return count;
 }
 
 /*

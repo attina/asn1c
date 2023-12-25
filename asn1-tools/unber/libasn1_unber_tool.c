@@ -27,8 +27,10 @@
 #include "asn1_common.h"
 #include "libasn1_unber_tool.h"
 
-#define ASN_DISABLE_PER_SUPPORT 1
+#define ASN_DISABLE_UPER_SUPPORT 1
+#define ASN_DISABLE_APER_SUPPORT 1
 #define ASN_DISABLE_OER_SUPPORT 1
+#define ASN_DISABLE_PRINT_SUPPORT 1
 
 #include <asn1parser.h> /* For static string tables */
 
@@ -37,9 +39,22 @@
 #include <ber_tlv_tag.c>
 #include <ber_tlv_length.c>
 #include <INTEGER.c>
+#include <INTEGER_ber.c>
+#include <INTEGER_xer.c>
+#include <INTEGER_jer.c>
+#include <INTEGER_rfill.c>
 #include <OBJECT_IDENTIFIER.c>
+#include <OBJECT_IDENTIFIER_xer.c>
+#include <OBJECT_IDENTIFIER_jer.c>
+#include <OBJECT_IDENTIFIER_rfill.c>
 #include <RELATIVE-OID.c>
+#include <RELATIVE-OID_xer.c>
+#include <RELATIVE-OID_jer.c>
+#include <RELATIVE-OID_rfill.c>
 #include <asn_codecs_prim.c>
+#include <asn_codecs_prim_ber.c>
+#include <asn_codecs_prim_jer.c>
+#include <asn_codecs_prim_xer.c>
 #include <asn1p_integer.c>
 #include <asn_internal.c>
 
@@ -153,7 +168,7 @@ process_deeper(const char *fname, input_stream_t *ibs, output_stream_t *os,
             osprintfError(os,
                           "%s: Too long TL sequence (%zd >= %zd) at %lld. "
                           "Broken or maliciously constructed file\n",
-                          fname, tblen, limit, (long long)ibs->bytesRead(ibs));
+                          fname, tblen, limit, (long long int) ibs->bytesRead(ibs));
             return PD_FAILED;
         }
 
@@ -161,7 +176,7 @@ process_deeper(const char *fname, input_stream_t *ibs, output_stream_t *os,
             osprintfError(os,
                           "%s: Too long TL sequence (%zd bytes) at %lld. "
                           "Broken or maliciously constructed file\n",
-                          fname, tblen, (long long)ibs->bytesRead(ibs));
+                          fname, tblen, (long long int) ibs->bytesRead(ibs));
             return PD_FAILED;
         }
 
@@ -318,7 +333,7 @@ print_TL(output_stream_t *os, int fin, off_t offset, int level, int constr,
     osprintf(os, constr ? ((tlv_len == -1) ? "I" : "C") : "P");
 
     /* Print out the offset of this boundary, even if closing tag */
-    if(!minimalistic) osprintf(os, " O=\"%lld\"", (long long)offset);
+    if(!minimalistic) osprintf(os, " O=\"%lld\"", (long long int) offset);
 
     osprintf(os, " T=\"%s\"", ber_tlv_tag_string(tlv_tag));
 
@@ -369,7 +384,7 @@ print_V(const char *fname, input_stream_t *ibs, output_stream_t *os,
      * Determine how to print the value, either in its native binary form,
      * encoded with &xNN characters, or using pretty-printing.
      * The basic string types (including "useful types", like UTCTime)
-     * are excempt from this determination logic, because their alphabets
+     * are exempt from this determination logic, because their alphabets
      * are subsets of the XML's native UTF-8 encoding.
      */
     switch(etype) {
@@ -810,8 +825,35 @@ xer_decode_general(const asn_codec_ctx_t *opt_codec_ctx, asn_struct_ctx_t *ctx,
     return rv;
 }
 
+asn_dec_rval_t
+jer_decode_general(const asn_codec_ctx_t *opt_codec_ctx, asn_struct_ctx_t *ctx,
+                   void *struct_key, const char *json_key, const void *buf_ptr,
+                   size_t size,
+                   int (*otd)(void *struct_key, const void *chunk_buf,
+                              size_t chunk_size),
+                   ssize_t (*br)(void *struct_key, const void *chunk_buf,
+                                 size_t chunk_size, int have_more)) {
+    asn_dec_rval_t rv = {0, 0};
+    (void)opt_codec_ctx;
+    (void)ctx;
+    (void)struct_key;
+    (void)json_key;
+    (void)buf_ptr;
+    (void)size;
+    (void)otd;
+    (void)br;
+    return rv;
+}
+
 size_t
 xer_whitespace_span(const void *chunk_buf, size_t chunk_size) {
+    (void)chunk_buf;
+    (void)chunk_size;
+    return 0;
+}
+
+size_t
+jer_whitespace_span(const void *chunk_buf, size_t chunk_size) {
     (void)chunk_buf;
     (void)chunk_size;
     return 0;
@@ -831,4 +873,3 @@ asn_random_between(intmax_t a, intmax_t b) {
     (void)b;
     return a;
 };
-

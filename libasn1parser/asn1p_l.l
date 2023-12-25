@@ -7,6 +7,9 @@
 #include "asn1parser.h"
 #include "asn1p_y.h"
 
+/* Workaround for https://github.com/vlm/asn1c/issues/321 */
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 int asn1p_lex(void);
 void asn1p_lexer_hack_push_opaque_state(void);		/* Used in .y */
 void asn1p_lexer_hack_enable_with_syntax(void);		/* Used in .y */
@@ -31,7 +34,7 @@ static asn1c_integer_t _lex_atoi(const char *ptr);
 static double          _lex_atod(const char *ptr);
 
 /*
- * Check that the type is defined in the year of the standard choosen.
+ * Check that the type is defined in the year of the standard chosen.
  */
 #define	TYPE_LIFETIME(fyr, lyr)				\
 	(!asn1p_lexer_types_year			\
@@ -317,7 +320,7 @@ EXCEPT			return TOK_EXCEPT;
 EXPLICIT		return TOK_EXPLICIT;
 EXPORTS			return TOK_EXPORTS;
 EXTENSIBILITY		return TOK_EXTENSIBILITY;
-EXTERNAL		return TOK_EXTERNAL;
+	/*EXTERNAL		return TOK_EXTERNAL;*/
 FALSE			return TOK_FALSE;
 FROM			return TOK_FROM;
 GeneralizedTime		return TOK_GeneralizedTime;
@@ -378,7 +381,8 @@ UTF8String		{
 VideotexString		return TOK_VideotexString;
 VisibleString		return TOK_VisibleString;
 WITH			return TOK_WITH;
-
+SUCCESSORS		return TOK_SUCCESSORS;
+DESCENDANTS		return TOK_DESCENDANTS;
 
 <INITIAL,with_syntax>&[A-Z][A-Za-z0-9]*([-][A-Za-z0-9]+)*	{
 		asn1p_lval.tv_str = strdup(yytext);
